@@ -3,13 +3,17 @@ import cv2 as cv
 import numpy as np
 import subprocess
 
-def edge_detect(img):
-    edges = img / np.repeat(np.linalg.norm(img, axis=-1), 3).reshape(np.shape(img)) * 255
-    edges = edges.astype(np.uint8)
-    green = cv.inRange(edges, (100, 180, 0), (200, 255, 80))
+def preprocess_img(img):
+    norm = img / np.repeat(np.linalg.norm(img, axis=-1), 3).reshape(np.shape(img)) * 255
+    norm = norm.astype(np.uint8)
+    green = cv.inRange(norm, (100, 180, 0), (200, 255, 80))
+    # bright_green = cv.inRange(norm, (120, 190, 80), (200, 255, 100))
     bright_green = cv.inRange(img, (90, 150, 60), (200, 255, 150))
-    edges = cv.bitwise_or(green, bright_green)
-    return cv.Canny(edges, 150, 200, apertureSize = 3)
+    return cv.bitwise_or(green, bright_green)
+
+
+def edge_detect(img):
+    return cv.Canny(img, 150, 200, apertureSize = 3)
 
 
 def absdiff(a, b):
@@ -64,7 +68,8 @@ def detect_lines(img):
     horizontal = []
     vertical = []
 
-    edges = edge_detect(img)
+    norm = preprocess_img(img)
+    edges = edge_detect(norm)
     lines = cv.HoughLines(edges, 1, np.pi/180/4, 180)
 
     if lines is None:
@@ -84,12 +89,14 @@ def detect_lines(img):
         elif theta > np.pi / 2 - eps:
             horizontal.append(line[0])
 
-    return horizontal, vertical
+    return vertical, horizontal
     
     
 def main():
     input = sys.argv[1]
     output = sys.argv[2]
+
+    debug = len(sys.argv) > 3 and sys.argv[3] == "--debug";
 
     vertical = []
     horizontal = []
@@ -118,10 +125,25 @@ def main():
     x2 = width
     y1 = 0
     y2 = height
+
+    img = None
+    if debug:
+        vid = cv.VideoCapture(input)
+        _, _img = vid.read()
+        img = _img
+        norm = preprocess_img(img)
+        edges = edge_detect(norm)
+        cv.imwrite("norm.jpg", norm)
+        cv.imwrite("edges.jpg", edges)
+        
     
     for r, theta in vertical:
         a = int(hough_intersect_y(theta, r, 0))
         b = int(hough_intersect_y(theta, r, height))
+
+        if debug:
+            cv.line(img, (a, 0), (b, height), (255, 0, 0))   
+
         for x in [a, b]:
             if x < width / 2:
                 x1 = max(x1, x)
@@ -131,11 +153,19 @@ def main():
     for r, theta in horizontal:
         a = int(hough_intersect_x(theta, r, x1))
         b = int(hough_intersect_x(theta, r, x2))
+
+        if debug:
+            cv.line(img, (x1, a), (x2, a), (0, 0, 255))
+
         for y in [a, b]:
             if y < height / 2:
                 y1 = max(y1, y)
             else:
                 y2 = min(y2, y)
+
+    if debug:
+        cv.rectangle(img, (x1, y1), (x2, y2), (255, 0, 255), 2)
+        cv.imwrite("out.jpg", img)
                 
     w = x2 - x1
     h = y2 - y1
