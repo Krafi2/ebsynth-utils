@@ -64,6 +64,11 @@ def hough_intersect_x(theta, r, x):
     return (r - x * c) / s
 
 
+def line_point_dist(p1, p2, p3):
+    p1, p2, p3 = [np.asarray(p) for p in [p1, p2, p3]]
+    return np.linalg.norm(np.cross(p2-p1, p1-p3))/np.linalg.norm(p2-p1)
+
+
 def detect_lines(img):
     horizontal = []
     vertical = []
@@ -113,7 +118,7 @@ def main():
             print(f"Error while decoding frame {i}")
             continue
 
-        if i % (frames // 4) == 0:
+        if i % (frames // 3) == 0:
             v, h = detect_lines(img)
             vertical += v
             horizontal += h
@@ -136,13 +141,19 @@ def main():
         cv.imwrite("norm.jpg", norm)
         cv.imwrite("edges.jpg", edges)
         
+    min_dist = min(width, height) * 1/3
     
     for r, theta in vertical:
         a = int(hough_intersect_y(theta, r, 0))
         b = int(hough_intersect_y(theta, r, height))
+        p1 = (a, 0)
+        p2 = (b, height)
+
+        if line_point_dist(p1, p2, (width//2, height//2)) < min_dist:
+            continue
 
         if debug:
-            cv.line(img, (a, 0), (b, height), (255, 0, 0))   
+            cv.line(img, p1, p2, (255, 0, 0))   
 
         for x in [a, b]:
             if x < width / 2:
@@ -153,9 +164,14 @@ def main():
     for r, theta in horizontal:
         a = int(hough_intersect_x(theta, r, x1))
         b = int(hough_intersect_x(theta, r, x2))
+        p1 = (x1, a)
+        p2 = (x2, b)
+
+        if line_point_dist(p1, p2, (width//2, height//2)) < min_dist:
+            continue
 
         if debug:
-            cv.line(img, (x1, a), (x2, a), (0, 0, 255))
+            cv.line(img, p1, p2, (0, 0, 255))
 
         for y in [a, b]:
             if y < height / 2:
