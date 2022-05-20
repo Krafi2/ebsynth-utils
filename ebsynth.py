@@ -28,6 +28,9 @@ def parse_args() -> Dict:
                 opts["ebsynth"] = next(args)
             elif a == "-v":
                 opts["verbose"] += 1
+            elif a.startswith("-"):
+                print(f"Error: Unknown parameter '{a}'")
+                exit(1)
             else:
                 if pos == 0:
                     opts["frame_path"]= a
